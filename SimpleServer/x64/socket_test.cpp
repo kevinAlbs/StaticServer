@@ -51,23 +51,23 @@ void onConnect(uv_stream_t* server, int status)
 	}
 }
 
-int main(int argc, char** argv) {
-	// TODO: First read all of the files in a directory, and mmap them.
-
-	uv_loop_init(&loop);
-
-	uv_tcp_init(&loop, &server);
-	
-	struct sockaddr_in addr;
-	uv_ip4_addr("0.0.0.0", kPort, &addr);
-
-	std::cout << "Listening for connection on port " << kPort << std::endl;
-
-	// Bind the handle to this address.
-	uv_tcp_bind(&server, (sockaddr*)&addr, 0);
-
-	// Listen for new connections.
-	// max backlog is the maximum number of queued connections before they start getting dropped.
-	int r = uv_listen(reinterpret_cast<uv_stream_t*>(&server), kMaxBacklog, onConnect);
-	uv_run(&loop, UV_RUN_DEFAULT);
-}
+//int main(int argc, char** argv) {
+//	// TODO: First read all of the files in a directory, and mmap them.
+//
+//	uv_loop_init(&loop);
+//
+//	uv_tcp_init(&loop, &server);
+//	
+//	struct sockaddr_in addr;
+//	uv_ip4_addr("0.0.0.0", kPort, &addr);
+//
+//	std::cout << "Listening for connection on port " << kPort << std::endl;
+//
+//	// Bind the handle to this address.
+//	uv_tcp_bind(&server, (sockaddr*)&addr, 0);
+//
+//	// Listen for new connections.
+//	// max backlog is the maximum number of queued connections before they start getting dropped.
+//	int r = uv_listen(reinterpret_cast<uv_stream_t*>(&server), kMaxBacklog, onConnect);
+//	uv_run(&loop, UV_RUN_DEFAULT);
+//}
