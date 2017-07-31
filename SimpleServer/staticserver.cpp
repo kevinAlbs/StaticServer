@@ -1,27 +1,48 @@
-#include "StaticServer.h"
+#include "staticserver.h"
 
 #include <iostream>
 #include <unordered_map>
+#include <sstream>
 
 namespace staticserver
 {
 
 namespace {
 
+typedef long ClientId;
 uv_loop_t _loop;
 uv_tcp_t _server; // stream which accepts TCP connections.
 Config _config;
-uint32_t currentId = 0;
+ClientId currentId = 0;
 
 struct Client
 {
     uv_tcp_t stream;
     char buffer[512]; // acts as both read and write (since static server)
+    std::stringstream request;
 };
 
-std::unordered_map<uint32_t, Client> clientMap; // todo: maybe not the best form of allocation
+std::unordered_map<ClientId, Client> clientMap; // todo: maybe not the best form of allocation
 
-// void _onRead(uv_stream_t* client, ssize_t nRead, ) {}
+void _onRead(uv_stream_t* clientHandle, long nRead, const uv_buf_t* buf) {
+    std::cout << "read data" << (char*)buf->base << std::endl;
+    ClientId clientId = (ClientId)clientHandle->data;
+    Client& client = clientMap.at(clientId);
+    client.request.write(buf->base, buf->len);
+
+    std::cout << "total data is " << client.request.str();
+
+    // if request is finished/valid, write back the resource requested.
+}
+
+// buffer may need to be larger?
+void _allocClientBuffer(uv_handle_t* clientHandle, unsigned long suggestedSize, uv_buf_t* buf) {
+    ClientId clientId = (ClientId)clientHandle->data;
+    Client& client = clientMap.at(clientId);
+    // todo: maybe don't ignore suggested size?
+    buf->base = client.buffer;
+    buf->len = sizeof(Client::buffer);
+}
 
 void _onConnect(uv_stream_t* server, int status) {
     if (_config.printInfo)
@@ -30,11 +51,12 @@ void _onConnect(uv_stream_t* server, int status) {
     if (status != 0) return;
 
     // allocate a connection (read/write buffer) + stream
-    uint32_t clientId = currentId++;
+    ClientId clientId = currentId++;
     if (_config.printInfo) std::cout << "client assigned " << clientId << std::endl;
     clientMap.emplace(clientId, Client());
     Client& client = clientMap.at(clientId);
     uv_tcp_init(&_loop, &client.stream);
+    client.stream.data = (void*)clientId; // TODO: use raw pointer to client?
 
     // accept this connection
     int acceptStatus = uv_accept(server, (uv_stream_t*)&client.stream);
@@ -45,7 +67,9 @@ void _onConnect(uv_stream_t* server, int status) {
     }
 
     // set up read listener
-    // uv_read_start((uv_stream_t*)&client.stream, _onRead);
+    // based on the docs, it says that the user is responsible for freeing the buffer and that
+    // libuv will not reuse it.
+    uv_read_start((uv_stream_t*)&client.stream, _allocClientBuffer, _onRead);
 }
 
 } // namespace
@@ -74,5 +98,6 @@ void start(const Config& inConfig) {
 
 int main(int argc, char** argv) {
     staticserver::Config config;
+    config.printInfo = true;
     staticserver::start(config);
 }
