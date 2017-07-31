@@ -34,9 +34,18 @@ void _badRequest(uv_stream_t* clientHandle) {
     static char* badRequestMsg = "HTTP blah blah bad request";
 }
 
+void _onClose(uv_handle_t* clientHandle) {
+    ClientId clientId = (ClientId)clientHandle->data;
+    clientMap.erase(clientId);
+}
+
 void _onWriteFinish(uv_write_t* clientHandle, int status) {
-    std::cout << "write finished";
+    std::cout << "write finished" << std::endl;
     if (status != 0) return _badRequest(clientHandle->handle);
+    ClientId clientId = (ClientId)clientHandle->handle->data;
+    std::cout << " client data " << clientId << std::endl;
+    Client& client = clientMap.at(clientId);
+    uv_close((uv_handle_t*)&client.stream, _onClose);
 }
 
 void _sendResponse(uv_stream_t* clientHandle) {
@@ -60,18 +69,13 @@ void _sendResponse(uv_stream_t* clientHandle) {
     std::cout << "got path" << path << std::endl;
 
     // Write the entire file (in buffer chunks).
-    static char* msg = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
+    static char* msg = "HTTP/1.1 200 OK\r\nContent-Length: 10\r\nContent-Type: text/plain\r\n\r\n1234567890\r\n\r\n";
 
-    uv_buf_t writeBuf = uv_buf_init(client.buffer, 45-6);
+    uv_buf_t writeBuf = uv_buf_init(client.buffer, strlen(msg) + 1);
     strcpy(client.buffer, msg);
     uv_buf_t writeBufs[1] = { writeBuf };
     uv_write(&client.writeReq, (uv_stream_t*)&client.stream, writeBufs, 1, _onWriteFinish);
 
-}
-
-void _onClose(uv_handle_t* clientHandle) {
-    ClientId clientId = (ClientId)clientHandle->data;
-    clientMap.erase(clientId);
 }
 
 void _onRead(uv_stream_t* clientHandle, long nRead, const uv_buf_t* buf) {
