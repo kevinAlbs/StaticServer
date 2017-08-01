@@ -76,14 +76,21 @@ void _sendResponse(uv_stream_t* clientHandle) {
     client.request >> path;
     std::cout << "got path" << path << std::endl;
 
+    // copy the write buffers before sending?
+    uv_buf_t* fileBufsCopy = new uv_buf_t[numFileBuffers + 1];
+    for (int i = 0; i < numFileBuffers + 1; i++) {
+        fileBufsCopy[i] = fileBuffers[i];
+    }
+
     // Write the entire file (in buffer chunks).
-    uv_write(&client.writeReq, (uv_stream_t*)&client.stream, fileBuffers, numFileBuffers + 1, _onWriteFinish);
+    uv_write(&client.writeReq, (uv_stream_t*)&client.stream, fileBufsCopy, numFileBuffers + 1, _onWriteFinish);
 
 }
 
 void _onRead(uv_stream_t* clientHandle, long nRead, const uv_buf_t* buf) {
     if (nRead == UV_EOF) {
         // Client ended early, just close.
+        std::cout << "eof detected, closing" << std::endl;
         uv_close((uv_handle_t*)clientHandle, _onClose);
         return;
     }
@@ -94,6 +101,12 @@ void _onRead(uv_stream_t* clientHandle, long nRead, const uv_buf_t* buf) {
     Client& client = clientMap.at(clientId);
     client.request.write(buf->base, nRead);
     client.requestLen += nRead;
+
+    std::string str(fileBuffers[0].base, fileBuffers[0].len);
+    std::cout << "fileBuffers[0]=" << str << std::endl;
+
+    std::string str2(fileBuffers[1].base, fileBuffers[1].len);
+    std::cout << "fileBuffers[1]=" << str2 << std::endl;
 
     if (client.requestLen > kMaxRequestLen)
     {
@@ -134,8 +147,11 @@ void _allocClientBuffer(uv_handle_t* clientHandle, unsigned long suggestedSize, 
     ClientId clientId = (ClientId)clientHandle->data;
     Client& client = clientMap.at(clientId);
     // todo: maybe don't ignore suggested size?
-    buf->base = client.buffer;
-    buf->len = sizeof(Client::buffer);
+    // buf->base = client.buffer;
+    // buf->len = sizeof(Client::buffer);
+    buf->base = new char[suggestedSize];
+    buf->len = suggestedSize;
+
 }
 
 void _onConnect(uv_stream_t* server, int status) {
@@ -204,10 +220,23 @@ void start(const Config& inConfig) {
         fileBuffers[i + 1] = uv_buf_init(rawFileData + (i * 512), bufferSize);
     }
 
+    
+    // numFileBuffers = 1;
+    // char* str = "this is a test";
+    // fileBuffers[1] = uv_buf_init(str, strlen(str));
+    // fileSize = strlen(str);
+
     std::stringstream headerStream; 
-    headerStream << "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\nContent-Length:" << fileSize << "\r\n\r\n";
-    header = (char*)headerStream.str().c_str();
+    headerStream << "HTTP/1.1 200 OK\r\nContent-Type: image/jpg \r\nContent-Length:" << fileSize << "\r\n\r\n";
+    std::string headerStr = headerStream.str();
+    char* header = (char*)headerStr.c_str();
+    // Why was this messing up?
+    // char* header = (char*)headerStream.str().c_str();
+    std::cout << "header is " << headerStr << std::endl;
     fileBuffers[0] = uv_buf_init(header, strlen(header)); // DON'T INCLUDE THE NULL CHARACTER!
+
+    std::string str3(fileBuffers[0].base, fileBuffers[0].len);
+    std::cout << "fileBuffers[0]=" << str3 << std::endl;
 
     uv_tcp_init(&_loop, &_server);
     // bind this TCP connection socket to any interface on this host (0.0.0.0).
