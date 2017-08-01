@@ -1,5 +1,6 @@
 #include "staticserver.h"
 
+#include <fstream>
 #include <iostream>
 #include <unordered_map>
 #include <sstream>
@@ -13,6 +14,13 @@ uv_tcp_t _server; // stream which accepts TCP connections.
 Config _config;
 ClientId currentId = 0;
 const int kMaxRequestLen = 1024;
+char* header;
+
+int fileSize = 0;
+char* rawFileData;
+uv_buf_t* fileBuffers;
+int fileBufferCount = 0;
+int numFileBuffers = 0;
 
 struct Client
 {
@@ -69,12 +77,7 @@ void _sendResponse(uv_stream_t* clientHandle) {
     std::cout << "got path" << path << std::endl;
 
     // Write the entire file (in buffer chunks).
-    static char* msg = "HTTP/1.1 200 OK\r\nContent-Length: 10\r\nContent-Type: text/plain\r\n\r\n1234567890\r\n\r\n";
-
-    uv_buf_t writeBuf = uv_buf_init(client.buffer, strlen(msg) + 1);
-    strcpy(client.buffer, msg);
-    uv_buf_t writeBufs[1] = { writeBuf };
-    uv_write(&client.writeReq, (uv_stream_t*)&client.stream, writeBufs, 1, _onWriteFinish);
+    uv_write(&client.writeReq, (uv_stream_t*)&client.stream, fileBuffers, numFileBuffers + 1, _onWriteFinish);
 
 }
 
@@ -170,6 +173,41 @@ void start(const Config& inConfig) {
     uv_loop_init(&_loop);
     if (_config.printInfo)
         std::cout << " starting server at port " << 1025 << std::endl;
+
+    std::ifstream fileIn("test.jpg", std::ios_base::in | std::ios_base::binary | std::ios_base::ate);
+    fileSize = fileIn.tellg();
+    std::cout << "file is " << fileSize << " bytes " << std::endl;
+
+    // seek to the beginning.
+    fileIn.seekg(0);
+
+    rawFileData = new char[fileSize];
+    // now read the entire file.
+    fileIn.read(rawFileData, fileSize);
+
+    //fileSize = 100;
+    //rawFileData = "this is a test";
+    //fileSize = strlen(rawFileData);
+
+    // now create buffers by dividing it up.
+    // TODO: please fix this crap.
+    numFileBuffers = ((fileSize + 511) / 512);
+    std::cout << "numFileBuffers=" << numFileBuffers << std::endl;
+    fileBuffers = new uv_buf_t[numFileBuffers + 1]; // 1 for header.
+    for (int i = 0; i < numFileBuffers; i++) {
+        int bufferSize = 512;
+        if (i == numFileBuffers - 1) {
+            // size may not be 512.
+            bufferSize = fileSize % 512;
+            std::cout << "buffer size of last is " << bufferSize << std::endl; // should be 385.
+        }
+        fileBuffers[i + 1] = uv_buf_init(rawFileData + (i * 512), bufferSize);
+    }
+
+    std::stringstream headerStream; 
+    headerStream << "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\nContent-Length:" << fileSize << "\r\n\r\n";
+    header = (char*)headerStream.str().c_str();
+    fileBuffers[0] = uv_buf_init(header, strlen(header)); // DON'T INCLUDE THE NULL CHARACTER!
 
     uv_tcp_init(&_loop, &_server);
     // bind this TCP connection socket to any interface on this host (0.0.0.0).
