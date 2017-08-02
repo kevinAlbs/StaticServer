@@ -67,7 +67,7 @@ void Server::_onClientConnect(int status) {
  	// the client session will need to access the filemap and loop (for tcp_init)
  	// client will also need to let the server know when it is closed...
 	ClientSession* clientSession = _allocClient();
-	int acceptStatus = uv_accept((uv_stream_t*)&_serverSocket, (uv_stream_t*)&clientSession->clientSocket);
+	int acceptStatus = uv_accept((uv_stream_t*)&_serverSocket, (uv_stream_t*)&clientSession->clientSocket());
     if (acceptStatus != 0)
     {
         std::cout << "failed to connect" << std::endl;
