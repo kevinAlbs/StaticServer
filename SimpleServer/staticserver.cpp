@@ -22,8 +22,9 @@ uv_buf_t* fileBuffers;
 int fileBufferCount = 0;
 int numFileBuffers = 0;
 
-struct Client
+class Client
 {
+public:
     uv_tcp_t stream;
     char buffer[512]; // acts as both read and write (since static server)
     std::stringstream request;
@@ -31,6 +32,19 @@ struct Client
     char lastFour[4] = {0, 0, 0, 0}; // circular queue
     int lastFourIter = 0; // points to one past the last read character.
     uv_write_t writeReq;
+
+    void sendNotFound() {
+        std::cout << "sending 404" << std::endl;
+        char* notFoundMsg = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n";
+        strcpy(buffer, notFoundMsg);
+        uv_buf_t writeBufs[] = { uv_buf_init(this->buffer, strlen(notFoundMsg)) };
+        uv_write(&writeReq, (uv_stream_t*)&stream, writeBufs, 1, [](uv_write_t* writeReq, int status){
+            std::cout << "finished" << std::endl;
+            // TODO: get client from writeReq->handle pointer.
+            // You get the idea.
+            uv_close((uv_handle_t))
+        });
+    }
 };
 
 std::unordered_map<ClientId, Client> clientMap; // todo: maybe not the best form of allocation
