@@ -28,6 +28,8 @@ private:
 
 	static void _onWriteFinish(uv_write_t* writeReq, int status);
 
+	static void _onTimeout(uv_timer_t* timerReq);
+
 	void _close();
 
 	void _onRead(long nRead, const uv_buf_t* buf);
@@ -48,6 +50,7 @@ private:
 	std::string _responseHeader;
 	uv_write_t _writeReq;
 	uv_buf_t* _writeBuffers;
+	uv_timer_t _timerReq;
 };
 
 } // namespace staticserver

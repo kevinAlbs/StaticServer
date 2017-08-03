@@ -38,14 +38,15 @@ void putDataInBuffers(char* data, int dataSize, uv_buf_t* startingBuffer) {
 void ClientSession::init(uv_loop_t* loop, FileMap* fileMap) {
 	this->_fileMap = fileMap;
 	uv_tcp_init(loop, &_clientSocket);
+	uv_timer_init(loop, &_timerReq);
 	_clientSocket.data = (void*)this;
+	_timerReq.data = (void*)this;
 }
 
 void ClientSession::start(std::function<void(ClientSession*)> onClose) {
 	_onClose = onClose;
-	uv_read_start((uv_stream_t*)&_clientSocket,
-		ClientSession::_allocClientBuffer,
-		ClientSession::_onReadThunk);
+	uv_read_start((uv_stream_t*)&_clientSocket, _allocClientBuffer, _onReadThunk);
+	uv_timer_start(&_timerReq, _onTimeout, STATICSERVER_TIMEOUT, 0);
 }
 
 uv_tcp_t& ClientSession::clientSocket() {
@@ -81,7 +82,19 @@ uv_tcp_t& ClientSession::clientSocket() {
 	clientSession->_close();
 }
 
+/* static */ void ClientSession::_onTimeout(uv_timer_t* timerReq) {
+	ClientSession* clientSession = handleToClientSession(timerReq);
+	std::cout << "timed out" << std::endl;
+	clientSession->_close();
+}
+
 void ClientSession::_close() {
+	// uv_close will cancel any pending write requests, passing UV_ECANCELED. So no need to worry
+	// about leaked write buffers.
+	uv_timer_stop(&_timerReq);
+	// _close can be called multiple times if the timer is triggered midst write. In this case
+	// we should not close again.
+	if (uv_is_closing((uv_handle_t*)&_clientSocket)) return;
 	uv_close((uv_handle_t*)&_clientSocket, _onCloseThunk);
 }
 
@@ -179,7 +192,6 @@ void ClientSession::_sendNotFound(const std::string& path) {
 	_responseHeader = responseStream.str();
 	int numBuffers = getNumBuffers(_responseHeader.size());
 	_writeBuffers = new uv_buf_t[numBuffers];
-	char* headerData = new char[_responseHeader.size()];
 	putDataInBuffers((char*)_responseHeader.data(), _responseHeader.size(), _writeBuffers);
 	uv_write(&_writeReq, (uv_stream_t*)&_clientSocket, _writeBuffers, numBuffers, _onWriteFinish);
 }
@@ -192,7 +204,6 @@ void ClientSession::_sendBadRequest(const std::string& msg) {
 	_responseHeader = responseStream.str();
 	int numBuffers = getNumBuffers(_responseHeader.size());
 	_writeBuffers = new uv_buf_t[numBuffers];
-	char* headerData = new char[_responseHeader.size()];
 	putDataInBuffers((char*)_responseHeader.data(), _responseHeader.size(), _writeBuffers);
 	uv_write(&_writeReq, (uv_stream_t*)&_clientSocket, _writeBuffers, numBuffers, _onWriteFinish);
 }
