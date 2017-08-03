@@ -9,9 +9,6 @@
 
 namespace staticserver {
 
-//class Client;
-
-
 // Responsible for reading the static files and listening for TCP client connections.
 class Server {
 public:

@@ -1,51 +1,53 @@
 #pragma once
 
-#include <iostream>
-#include <uv.h>
 #include <functional>
+#include <iostream>
+#include <sstream>
+#include <uv.h>
+
 #include "filemap.h"
 
 namespace staticserver {
 
 class ClientSession {
 public:
-	void init(uv_loop_t* loop, const FileMap* fileMap) {
-		this->_fileMap = fileMap;
-		uv_tcp_init(loop, &_clientSocket);
-		_clientSocket.data = (void*)this;
-	}
+	void init(uv_loop_t* loop, FileMap* fileMap);
 
-	void start(std::function<void(ClientSession*)> onClose) {
-		_onClose = onClose;
-		uv_read_start((uv_stream_t*)&_clientSocket,
-			ClientSession::_allocClientBuffer,
-			ClientSession::_onReadThunk);
-	}
+	void start(std::function<void(ClientSession*)> onClose);
 
-	uv_tcp_t& clientSocket() {
-		return _clientSocket;
-	}
+	uv_tcp_t& clientSocket();
 
 private:
+
 	static void _allocClientBuffer(
-		uv_handle_t* clientHandle, unsigned long suggestedSize, uv_buf_t* buf) {
-		ClientSession* clientSession = (ClientSession*)((uv_tcp_t*)clientHandle)->data;
-		buf->base = new char[suggestedSize];
-    	buf->len = suggestedSize;
-	}
+		uv_handle_t* clientHandle, unsigned long suggestedSize, uv_buf_t* buf);
 
-	static void _onReadThunk(uv_stream_t* clientStream, long nRead, const uv_buf_t* buf) {
-		ClientSession* clientSession = (ClientSession*)((uv_tcp_t*)clientStream)->data;
-		clientSession->_onRead(nRead, buf);
-	}
+	static void _onReadThunk(uv_stream_t* clientStream, long nRead, const uv_buf_t* buf);
 
-	void _onRead(long nRead, const uv_buf_t* buf) {
-		std::cout << "onread called" << std::endl;
-	}
+	static void _onCloseThunk(uv_handle_t* clientHandle);
 
+	static void _onWriteFinish(uv_write_t* writeReq, int status);
+
+	void _close();
+
+	void _onRead(long nRead, const uv_buf_t* buf);
+
+	void _sendResponse();
+
+	void _sendNotFound(const std::string& path);
+
+	void _sendBadRequest(const std::string& msg);
+
+	char _lastFour[4] = {0, 0, 0, 0}; // circular queue
+	int _lastFourIter = 0; // points to one past the last read character.
+	std::stringstream _request;
+	int _requestLen = 0;
 	uv_tcp_t _clientSocket;
-	const FileMap* _fileMap;
+	FileMap* _fileMap;
 	std::function<void(ClientSession*)> _onClose;
+	std::string _responseHeader;
+	uv_write_t _writeReq;
+	uv_buf_t* _writeBuffers;
 };
 
 } // namespace staticserver

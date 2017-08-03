@@ -1,5 +1,8 @@
 # TODO
 - finish cleanup
+- config
+- add timeouts (e.g. malformed request will never finish)
+- add IPC and multiple processes
 - add better allocation of client sessions (use a fixed array perhaps, and then allocate manually if that is filled)
 - comment, publish
 

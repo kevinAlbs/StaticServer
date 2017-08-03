@@ -1,13 +1,12 @@
-#include "clientsession.h"
 #include "staticserver.h"
+#include "clientsession.h"
+#include "config.h"
 
-#include <iostream>
 #include <fstream>
-#include <memory>
+#include <iostream>
 
 namespace staticserver {
 
-const int kBacklog = 128;
 const int kPort = 1025;
 
 Server::Server() {}
@@ -35,7 +34,7 @@ bool Server::addFile(const std::string& path, const std::string& mimeType) {
 	fileIn.read(fileEntry.rawFileData, fileEntry.fileSize);
 
 	// add to file map.
-	_fileMap.insert({path, fileEntry});
+	_fileMap.insert({"/" + path, fileEntry});
 
 	return true;
 }
@@ -49,7 +48,7 @@ void Server::start() {
     sockaddr_in serverAddr;
     uv_ip4_addr("0.0.0.0", kPort, &serverAddr);
     uv_tcp_bind(&_serverSocket, (sockaddr*)&serverAddr, 0);
-    uv_listen((uv_stream_t*)&_serverSocket, kBacklog, [](uv_stream_t* serverSocket, int status) {
+    uv_listen((uv_stream_t*)&_serverSocket, STATICSERVER_MAX_BACKLOG, [](uv_stream_t* serverSocket, int status) {
     	Server* server = (Server*)((uv_tcp_t*)serverSocket)->data;
     	server->_onClientConnect(status);
     });
