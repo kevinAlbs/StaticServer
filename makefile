@@ -1,7 +1,7 @@
-CC=clang++
+CC=g++
 
-server : server.cpp
-	$(CC) -std=c++11 -o server server.cpp -luv
+staticserver : staticserver.cpp clientsession.cpp staticserver.h clientsession.h filemap.h
+	$(CC) -std=c++11 -o staticserver staticserver.cpp clientsession.cpp -luv
 
-clean : server
-	rm server
+clean : staticserver
+	rm staticserver

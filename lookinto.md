@@ -1,14 +1,5 @@
-# TODO
-- finish cleanup
-- config
-- add timeouts (e.g. malformed request will never finish)
-- add IPC and multiple processes
-- add better allocation of client sessions (use a fixed array perhaps, and then allocate manually if that is filled)
-- comment, publish
-
-
 # Things to look into
-- How do lambdas work?
+- How exactly do lambdas work?
 It doesn't seem like you can use a member function as a callback directly. E.g. a function with the signature:
 void callMe(std::function<void(int)>);
 Cannot be called like:
